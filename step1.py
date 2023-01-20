@@ -6,12 +6,13 @@ from literai.summary import gpt_index_summarize
 def main():
     args = arg_parser().parse_args()
 
+    print("------------- PART 1 (Generate summaries) ------------- ")
+
     print("Generating base summary")
-    gpt_index_summarize(args.title, args.txt, "summary",
-                        max_length=256, min_length=8)
+    gpt_index_summarize(args.title, args.txt, "summary")
     print("Generating creative summary")
-    gpt_index_summarize(args.title, args.txt, "creative", max_length=256,
-                        min_length=8, early_stopping=True, length_penalty=0.4, num_beams=5)
+    gpt_index_summarize(args.title, args.txt, "creative",
+                        early_stopping=True, length_penalty=0.4, num_beams=8)
 
 
 if __name__ == '__main__':

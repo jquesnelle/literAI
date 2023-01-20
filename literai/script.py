@@ -65,7 +65,7 @@ INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob questions about the passa
 INSTRUCTION_BOB = "Imagine you are Bob and speak to Alice"
 
 
-def generate_scripts(title: str, part_glob=3, print_dialogue=False):
+def generate_scripts(title: str, part_glob=6, print_dialogue=False):
     gpt_indexed = get_output_dir(title, "gpt-indexed")
     scripts = get_output_dir(title, "scripts")
 
@@ -99,7 +99,7 @@ def generate_scripts(title: str, part_glob=3, print_dialogue=False):
     llm = HuggingFacePipeline(pipeline=pipe)
     chain = LLMChain(llm=llm, prompt=prompt)
 
-    for part, part_sections in tenumerate(joined_part_indicies, desc="Part"):
+    for part, part_sections in tenumerate(joined_part_indicies, desc="Part", leave=False):
 
         full_dialogue = [
             "Alice: Welcome to liter-AI, your local neighborhood literary podcast where we discuss, disect, and dismantle interesting novels and stories",
@@ -129,12 +129,14 @@ def generate_scripts(title: str, part_glob=3, print_dialogue=False):
 
                 alice_dialogue = []
                 bob_dialogue = []
+                passage_dialogue = []
 
-                for _ in trange(5, desc="Dialogue", leave=False):
+                for _ in trange(6, desc="Dialogue", leave=False):
                     response = chain.run(
-                        narrative=alice_situation, instruction=INSTRUCTION_ALICE, dialogue_history=alice_dialogue)
+                        narrative=alice_situation, instruction=INSTRUCTION_ALICE, dialogue_history=bob_dialogue)
                     response = f"Alice: {response}"
                     alice_dialogue.append(response)
+                    passage_dialogue.append(response)
                     full_dialogue.append(response)
                     if print_dialogue:
                         print(response)
@@ -143,6 +145,7 @@ def generate_scripts(title: str, part_glob=3, print_dialogue=False):
                         narrative=bob_situation, instruction=INSTRUCTION_BOB, dialogue_history=alice_dialogue)
                     response = f"Bob: {response}"
                     bob_dialogue.append(response)
+                    passage_dialogue.append(response)
                     full_dialogue.append(response)
                     if print_dialogue:
                         print(response)
