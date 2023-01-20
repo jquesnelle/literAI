@@ -15,7 +15,10 @@ from tqdm.contrib import tenumerate
 from .util import get_output_dir
 
 MODEL_ID = "allenai/cosmo-xl"
-
+MAX_DIALOGUE_TOKENS = 160
+TEMPERATURE = 1.0
+TOP_P = 0.95
+DIALOGUES_PER_PASSAGE = 5
 
 class NullLLM(BaseLLM):
     def _generate(
@@ -95,7 +98,7 @@ def generate_scripts(title: str, part_glob=6, print_dialogue=False):
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
     model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID)
     pipe = pipeline("text2text-generation", device=0 if torch.cuda.is_available()
-                    else -1, model=model, tokenizer=tokenizer, max_length=None, max_new_tokens=128, temperature=1.0, top_p=.95, do_sample=True, clean_up_tokenization_spaces=False)
+                    else -1, model=model, tokenizer=tokenizer, max_length=None, max_new_tokens=MAX_DIALOGUE_TOKENS, temperature=TEMPERATURE, top_p=TOP_P, do_sample=True, clean_up_tokenization_spaces=False)
     llm = HuggingFacePipeline(pipeline=pipe)
     chain = LLMChain(llm=llm, prompt=prompt)
 
@@ -131,7 +134,7 @@ def generate_scripts(title: str, part_glob=6, print_dialogue=False):
                 bob_dialogue = []
                 passage_dialogue = []
 
-                for _ in trange(6, desc="Dialogue", leave=False):
+                for _ in trange(DIALOGUES_PER_PASSAGE, desc="Dialogue", leave=False):
                     response = chain.run(
                         narrative=alice_situation, instruction=INSTRUCTION_ALICE, dialogue_history=bob_dialogue)
                     response = f"Alice: {response}"
