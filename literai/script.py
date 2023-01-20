@@ -19,6 +19,12 @@ MAX_DIALOGUE_TOKENS = 160
 TEMPERATURE = 1.0
 TOP_P = 0.95
 DIALOGUES_PER_PASSAGE = 5
+SITUATION = \
+    r"""Alice and Bob are hosts of a literary criticism podcast where the themes, motivations, and implications of novels are discussed. They are discussing a passage from a book they both recently read. The conversation is intelligent, nuanced, and elaborate.
+They are currently discussing the following passage:
+"""
+INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob questions about the passage"
+INSTRUCTION_BOB = "Imagine you are Bob and speak to Alice"
 
 class NullLLM(BaseLLM):
     def _generate(
@@ -58,15 +64,13 @@ def ordinal(n: int):
         suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
     return str(n) + suffix
 
-
-SITUATION = \
-    r"""Alice and Bob are hosts of a literary criticism podcast where the themes, motivations, and implications of novels are discussed. They are discussing a passage from a book they both recently read. The conversation is intelligent, nuanced, and elaborate.
-They are currently discussing the following passage:
-"""
-
-INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob questions about the passage"
-INSTRUCTION_BOB = "Imagine you are Bob and speak to Alice"
-
+def truncate_to_sentence(text: str) -> str:
+    last_index = text.rfind('.')
+    if last_index != -1:
+        ret = text[0:last_index]
+        return ret
+    else:
+        return text
 
 def generate_scripts(title: str, part_glob=6, print_dialogue=False):
     gpt_indexed = get_output_dir(title, "gpt-indexed")
@@ -119,16 +123,16 @@ def generate_scripts(title: str, part_glob=6, print_dialogue=False):
 
             section_node = summary_index.all_nodes[section_index]
             full_dialogue.append(
-                f"Bob: Alright, let's talk about our {ordinal(section+1) if section+1 != len(part_sections) else 'last'} section today. Here's a bit of a refresher on what happened: {section_node.text}")
+                f"Bob: Alright, let's talk about our {ordinal(section+1) if section+1 != len(part_sections) else 'last'} section today. Here's a bit of a refresher on what happened: {truncate_to_sentence(section_node.text)}")
             if print_dialogue:
                 print(full_dialogue[len(full_dialogue)-1])
 
             for passage_index in tqdm(section_node.child_indices, desc="Passage", leave=False):
 
                 alice_situation = SITUATION + \
-                    summary_index.all_nodes[passage_index].text
+                    truncate_to_sentence(summary_index.all_nodes[passage_index].text)
                 bob_situation = SITUATION + \
-                    summary_creative_index.all_nodes[passage_index].text
+                    truncate_to_sentence(summary_creative_index.all_nodes[passage_index].text)
 
                 alice_dialogue = []
                 bob_dialogue = []
