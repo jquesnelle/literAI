@@ -6,7 +6,7 @@ from literai.summary import gpt_index_summarize
 def main():
     args = arg_parser().parse_args()
 
-    print("------------- PART 1 (Generate summaries) ------------- ")
+    print("------------- PART 1 (Summarize text) ------------- ")
 
     print("Generating base summary")
     gpt_index_summarize(args.title, args.txt, "summary")

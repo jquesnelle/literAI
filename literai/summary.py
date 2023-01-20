@@ -8,8 +8,8 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
 from .util import get_output_dir
 
 MODEL_ID = "pszemraj/long-t5-tglobal-xl-16384-book-summary"
-MAX_SUMMARIZE_TOKENS = 1024
-TOKEN_OVERLAP = 16
+MAX_SUMMARIZE_TOKENS = 1280
+TOKEN_OVERLAP = 128
 MIN_TOKENS = 8
 MAX_TOKENS = 128
 

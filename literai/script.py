@@ -26,6 +26,7 @@ They are currently discussing the following passage:
 INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob questions about the passage"
 INSTRUCTION_BOB = "Imagine you are Bob and speak to Alice"
 
+
 class NullLLM(BaseLLM):
     def _generate(
         self, prompts: List[str], stop: Optional[List[str]] = None
@@ -64,13 +65,6 @@ def ordinal(n: int):
         suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
     return str(n) + suffix
 
-def truncate_to_sentence(text: str) -> str:
-    last_index = text.rfind('.')
-    if last_index != -1:
-        ret = text[0:last_index]
-        return ret
-    else:
-        return text
 
 def generate_scripts(title: str, part_glob=6, print_dialogue=False):
     gpt_indexed = get_output_dir(title, "gpt-indexed")
@@ -109,11 +103,11 @@ def generate_scripts(title: str, part_glob=6, print_dialogue=False):
     for part, part_sections in tenumerate(joined_part_indicies, desc="Part", leave=False):
 
         full_dialogue = [
-            "Alice: Welcome to liter-AI, your local neighborhood literary podcast where we discuss, disect, and dismantle interesting novels and stories",
+            "Alice: Welcome to liter A I, your local neighborhood literary podcast where we discuss, disect, and dismantle interesting novels and stories",
             "Bob: I'm Bob, a computer generated personality",
             f"Alice: And I'm Alice, and I'm also a computer generated personality. This is the {ordinal(part+1)} of our {len(joined_part_indicies)} part series on \"{title}\"",
-            "Bob: Please support researchers that facilitate equal access to human knowledge by open sourcing their AI models",
-            "Alice: That's right, Bob. Remember there's nothing open about AI that's stuck behind an API! Okay, let's get started"
+            "Bob: Please support researchers that facilitate equal access to human knowledge by open sourcing their A I models",
+            "Alice: That's right, Bob. Remember there's nothing open about A I that's stuck behind an A P I! Okay, let's get started"
         ]
         if print_dialogue:
             for x in full_dialogue:
@@ -123,16 +117,16 @@ def generate_scripts(title: str, part_glob=6, print_dialogue=False):
 
             section_node = summary_index.all_nodes[section_index]
             full_dialogue.append(
-                f"Bob: Alright, let's talk about our {ordinal(section+1) if section+1 != len(part_sections) else 'last'} section today. Here's a bit of a refresher on what happened: {truncate_to_sentence(section_node.text)}")
+                f"Bob: Alright, let's talk about our {ordinal(section+1) if section+1 != len(part_sections) else 'last'} section today. Here's a bit of a refresher of where we are: {summary_index.all_nodes[section_node.child_indices[0]].text}")
             if print_dialogue:
                 print(full_dialogue[len(full_dialogue)-1])
 
             for passage_index in tqdm(section_node.child_indices, desc="Passage", leave=False):
 
                 alice_situation = SITUATION + \
-                    truncate_to_sentence(summary_index.all_nodes[passage_index].text)
+                    summary_index.all_nodes[passage_index].text
                 bob_situation = SITUATION + \
-                    truncate_to_sentence(summary_creative_index.all_nodes[passage_index].text)
+                    summary_creative_index.all_nodes[passage_index].text
 
                 alice_dialogue = []
                 bob_dialogue = []
