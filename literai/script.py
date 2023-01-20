@@ -1,14 +1,20 @@
 import os
+import torch
 from typing import List, Optional
+from langchain import HuggingFacePipeline
 from langchain.llms.base import BaseLLM
 from langchain.schema import LLMResult
+from langchain.prompts import BasePromptTemplate
+from langchain.chains import LLMChain
 from gpt_index import GPTTreeIndex, LLMPredictor
 from gpt_index.data_structs import IndexGraph
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 from tqdm import tqdm
 from tqdm.auto import trange
 from tqdm.contrib import tenumerate
 from .util import get_output_dir
+
+MODEL_ID = "allenai/cosmo-xl"
 
 
 class NullLLM(BaseLLM):
@@ -22,34 +28,24 @@ class NullLLM(BaseLLM):
         return "NullLLM"
 
 
-def set_input(narrative, instruction, dialogue_history):
-    input_text = " <turn> ".join(dialogue_history)
+class CosmoPromptTemplate(BasePromptTemplate):
 
-    if instruction != "":
-        input_text = instruction + " <sep> " + input_text
+    input_variables: List[str] = [
+        "narrative", "instruction", "dialogue_history"]
 
-    if narrative != "":
-        input_text = narrative + " <sep> " + input_text
+    def _set_input(narrative: str, instruction: str, dialogue_history: List[str]) -> str:
+        input_text = " <turn> ".join(dialogue_history)
 
-    return input_text
+        if instruction != "":
+            input_text = instruction + " <sep> " + input_text
 
+        if narrative != "":
+            input_text = narrative + " <sep> " + input_text
 
-def generate(model, tokenizer, narrative, instruction, dialogue_history):
-    """
-    narrative: the description of situation/context with the characters included (e.g., "David goes to an amusement park")
-    instruction: the perspective/speaker instruction (e.g., "Imagine you are David and speak to his friend Sarah").
-    dialogue history: the previous utterances in the dialogue in a list
-    """
+        return input_text
 
-    input_text = set_input(narrative, instruction, dialogue_history)
-
-    inputs = tokenizer([input_text], return_tensors="pt").to('cuda')
-    outputs = model.generate(
-        inputs["input_ids"], max_new_tokens=128, temperature=1.0, top_p=.95, do_sample=True)
-    response = tokenizer.decode(
-        outputs[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
-
-    return response
+    def format(self, **kwargs) -> str:
+        return CosmoPromptTemplate._set_input(kwargs['narrative'], kwargs['instruction'], kwargs['dialogue_history'])
 
 
 def ordinal(n: int):
@@ -95,9 +91,13 @@ def generate_scripts(title: str, part_glob=3, print_dialogue=False):
             joined_part_indicies[len(
                 joined_part_indicies) - 1].extend(part_indicies[part_indicies_index:])
 
-    tokenizer = AutoTokenizer.from_pretrained("allenai/cosmo-xl")
-    model = AutoModelForSeq2SeqLM.from_pretrained(
-        "allenai/cosmo-xl").to('cuda')
+    prompt = CosmoPromptTemplate()
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID)
+    pipe = pipeline("text2text-generation", device=0 if torch.cuda.is_available()
+                    else -1, model=model, tokenizer=tokenizer, max_length=None, max_new_tokens=128, temperature=1.0, top_p=.95, do_sample=True, clean_up_tokenization_spaces=False)
+    llm = HuggingFacePipeline(pipeline=pipe)
+    chain = LLMChain(llm=llm, prompt=prompt)
 
     for part, part_sections in tenumerate(joined_part_indicies, desc="Part"):
 
@@ -127,20 +127,22 @@ def generate_scripts(title: str, part_glob=3, print_dialogue=False):
                 bob_situation = SITUATION + \
                     summary_creative_index.all_nodes[passage_index].text
 
-                partial_dialogue = []
+                alice_dialogue = []
+                bob_dialogue = []
 
                 for _ in trange(5, desc="Dialogue", leave=False):
-                    response = generate(model, tokenizer,
-                                        alice_situation, INSTRUCTION_ALICE, partial_dialogue)
+                    response = chain.run(
+                        narrative=alice_situation, instruction=INSTRUCTION_ALICE, dialogue_history=alice_dialogue)
                     response = f"Alice: {response}"
-                    partial_dialogue.append(response)
+                    alice_dialogue.append(response)
                     full_dialogue.append(response)
                     if print_dialogue:
                         print(response)
 
-                    response = generate(model, tokenizer,
-                                        bob_situation, INSTRUCTION_BOB, partial_dialogue)
+                    response = chain.run(
+                        narrative=bob_situation, instruction=INSTRUCTION_BOB, dialogue_history=alice_dialogue)
                     response = f"Bob: {response}"
+                    bob_dialogue.append(response)
                     full_dialogue.append(response)
                     if print_dialogue:
                         print(response)
