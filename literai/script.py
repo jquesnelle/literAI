@@ -15,16 +15,16 @@ from tqdm.contrib import tenumerate
 from .util import get_output_dir
 
 MODEL_ID = "allenai/cosmo-xl"
-MAX_DIALOGUE_TOKENS = 160
-TEMPERATURE = 1.0
+MAX_DIALOGUE_TOKENS = 128
+TEMPERATURE = 0.9
 TOP_P = 0.95
-DIALOGUES_PER_PASSAGE = 5
+DIALOGUES_PER_PASSAGE = 3
 SITUATION = \
-    r"""Alice and Bob are hosts of a literary criticism podcast where the themes, motivations, and implications of novels are discussed. They are discussing a passage from a book they both recently read. The conversation is intelligent, nuanced, and elaborate.
+    r"""Alice and Bob are hosts of a literary criticism podcast. They are discussing a passage from a book they both recently read. The conversation is academic, intelligent, nuanced, and elaborate.
 They are currently discussing the following passage:
 """
 INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob questions about the passage"
-INSTRUCTION_BOB = "Imagine you are Bob and speak to Alice"
+INSTRUCTION_BOB = "Imagine you are Bob and respond to Alice"
 
 
 class NullLLM(BaseLLM):
@@ -66,7 +66,7 @@ def ordinal(n: int):
     return str(n) + suffix
 
 
-def generate_scripts(title: str, part_glob=6, print_dialogue=False):
+def generate_scripts(title: str, part_glob=4, print_dialogue=False):
     gpt_indexed = get_output_dir(title, "gpt-indexed")
     scripts = get_output_dir(title, "scripts")
 
@@ -116,12 +116,13 @@ def generate_scripts(title: str, part_glob=6, print_dialogue=False):
         for section, section_index in tenumerate(part_sections, desc="Section", leave=False):
 
             section_node = summary_index.all_nodes[section_index]
+            section_child_indicies = sorted(section_node.child_indices)
             full_dialogue.append(
-                f"Bob: Alright, let's talk about our {ordinal(section+1) if section+1 != len(part_sections) else 'last'} section today. Here's a bit of a refresher of where we are: {summary_index.all_nodes[section_node.child_indices[0]].text}")
+                f"Bob: Alright, let's talk about our {ordinal(section+1) if section+1 != len(part_sections) else 'last'} section today. Here's a bit of a refresher of where we are: {summary_creative_index.all_nodes[section_child_indicies[0]].text}")
             if print_dialogue:
                 print(full_dialogue[len(full_dialogue)-1])
 
-            for passage_index in tqdm(section_node.child_indices, desc="Passage", leave=False):
+            for passage_index in tqdm(section_child_indicies, desc="Passage", leave=False):
 
                 alice_situation = SITUATION + \
                     summary_index.all_nodes[passage_index].text
@@ -131,6 +132,11 @@ def generate_scripts(title: str, part_glob=6, print_dialogue=False):
                 alice_dialogue = []
                 bob_dialogue = []
                 passage_dialogue = []
+
+                # one trick here is to only pass in the opposite side of the dialogue as history.
+                # it seems that cosmo can effectively "infer" what one side would have said given the
+                # other, and this lets is double the history (which is needed given cosmo's very short)
+                # input token limit (512)
 
                 for _ in trange(DIALOGUES_PER_PASSAGE, desc="Dialogue", leave=False):
                     response = chain.run(

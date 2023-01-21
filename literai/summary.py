@@ -9,9 +9,9 @@ from .util import get_output_dir
 
 MODEL_ID = "pszemraj/long-t5-tglobal-xl-16384-book-summary"
 MAX_SUMMARIZE_TOKENS = 1280
-TOKEN_OVERLAP = 128
+TOKEN_OVERLAP = 0
 MIN_TOKENS = 8
-MAX_TOKENS = 128
+MAX_TOKENS = 160
 
 
 def gpt_index_summarize(title: str, text_path: str, summary_tag: str, **kwargs):
