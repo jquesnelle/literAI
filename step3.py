@@ -11,7 +11,7 @@ def main():
 
     print("------------- PART 3 (Record audio) ------------- ")
 
-    record_podcast(args.title, args.alice_voice, args.bob_voice, save_recorded_lines=True)
+    record_podcast(args.title, [args.alice_voice, args.bob_voice])
 
 
 if __name__ == '__main__':

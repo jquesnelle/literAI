@@ -8,7 +8,7 @@ def main():
 
     print("------------- PART 2 (Write scripts) ------------- ")
 
-    generate_scripts(args.title)
+    generate_scripts(args.title, args.author)
 
 
 if __name__ == '__main__':
