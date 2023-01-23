@@ -7,24 +7,14 @@ from langchain.llms.base import BaseLLM
 from langchain.schema import LLMResult
 from langchain.prompts import BasePromptTemplate
 from langchain.chains import LLMChain
-from gpt_index import GPTTreeIndex, LLMPredictor
-from gpt_index.data_structs import IndexGraph
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 from tqdm import tqdm
 from tqdm.auto import trange
-from tqdm.contrib import tenumerate
 from .util import get_output_dir
 
 MODEL_ID = "allenai/cosmo-xl"
-MAX_DIALOGUE_TOKENS = 128
-TEMPERATURE = 0.9
-TOP_P = 0.95
-DIALOGUES_PER_PASSAGE = 3
-SITUATION = \
-    r"""Alice and Bob are hosts of a literary criticism podcast. They are discussing a passage from a book they both recently read. The conversation is academic, intelligent, nuanced, and elaborate.
-They are currently discussing the following passage:
-"""
-INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob questions about the passage"
+SITUATION = "Alice and Bob are hosts of a literary criticism podcast. They are discussing a passage from the book \"{title}\" by \"{author}\" that they both recently read. The conversation is academic, intelligent, nuanced, and elaborate. They are currently discussing the following passage:\n{passage}"
+INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob questions using specific details from the passage"
 INSTRUCTION_BOB = "Imagine you are Bob and respond to Alice"
 
 
@@ -67,43 +57,49 @@ def ordinal(n: int):
     return str(n) + suffix
 
 
-def generate_scripts(title: str, author: str, part_glob=4, print_dialogue=False):
-    gpt_indexed = get_output_dir(title, "gpt-indexed")
-    scripts = get_output_dir(title, "scripts")
+def generate_scripts(
+        title: str,
+        author: str,
+        summary_long="summary-2048-256.txt",
+        summary_short="summary-2048-128.txt",
+        sections_per_part=20,
+        max_dialogue_tokens=128,
+        summary_context_tokens=128,
+        dialogue_history_len=3,
+        dialogues_per_passage=3,
+        sections_per_refresher=4,
+        temperature=1.0,
+        top_p=0.95,
+        print_dialogue=False):
 
-    summary = GPTTreeIndex.load_from_disk(
-        os.path.join(gpt_indexed, "gpt-indexed-summary.json"), llm_predictor=LLMPredictor(NullLLM()))
-    summary_index: IndexGraph = summary.index_struct
+    summary_long = [x.strip() for x in open(os.path.join(get_output_dir(
+        title, "summaries"), summary_long), "r", encoding="utf-8").readlines()]
+    summary_short = [x.strip() for x in open(os.path.join(get_output_dir(
+        title, "summaries"), summary_short), "r", encoding="utf-8").readlines()]
 
-    summary_creative = GPTTreeIndex.load_from_disk(
-        os.path.join(gpt_indexed, "gpt-indexed-creative.json"), llm_predictor=LLMPredictor(NullLLM()))
-    summary_creative_index: IndexGraph = summary_creative.index_struct
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 
-    part_indicies = []
-    for root_node in summary_index.root_nodes.values():
-        part_indicies.extend(root_node.child_indices)
-    part_indicies = sorted(part_indicies)
+    parts_long = [summary_long[i:i+sections_per_part]
+                  for i in range(0, len(summary_long), sections_per_part)]
+    parts_short = [summary_short[i:i+sections_per_part]
+                   for i in range(0, len(summary_short), sections_per_part)]
 
-    joined_part_indicies: List[List[int]] = []
-    for part_indicies_index in range(0, len(part_indicies), part_glob):
-        if part_indicies_index + part_glob < len(part_indicies):
-            joined_part_indicies.append(
-                [part_indicies[part_indicies_index + i] for i in range(0, part_glob)])
-        else:
-            joined_part_indicies[len(
-                joined_part_indicies) - 1].extend(part_indicies[part_indicies_index:])
+    # make last part longer
+    if len(parts_long) > 1:
+        parts_long[len(parts_long) - 2].extend(parts_long.pop())
+        parts_short[len(parts_short) - 2].extend(parts_short.pop())
 
     prompt = CosmoPromptTemplate()
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+
     model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID)
     pipe = pipeline("text2text-generation", device=0 if torch.cuda.is_available()
-                    else -1, model=model, tokenizer=tokenizer, max_length=None, max_new_tokens=MAX_DIALOGUE_TOKENS, temperature=TEMPERATURE, top_p=TOP_P, do_sample=True, clean_up_tokenization_spaces=False)
+                    else -1, model=model, tokenizer=tokenizer, max_length=None, max_new_tokens=max_dialogue_tokens, temperature=temperature, top_p=top_p, do_sample=True, clean_up_tokenization_spaces=False)
     llm = HuggingFacePipeline(pipeline=pipe)
     chain = LLMChain(llm=llm, prompt=prompt)
 
-    num_parts = len(joined_part_indicies)
+    num_parts = len(parts_long)
 
-    for part, part_sections in tenumerate(joined_part_indicies, desc="Part", leave=False):
+    for part in trange(0, num_parts, desc="Part", leave=False):
 
         obj = {
             'book_title': title,
@@ -143,34 +139,47 @@ def generate_scripts(title: str, author: str, part_glob=4, print_dialogue=False)
             'text': full_dialogue[4][7:],
         }])
 
-        for section, section_index in tenumerate(part_sections, desc="Section", leave=False):
+        num_sections = len(parts_long[part])
+        since_last_refresher = sections_per_refresher
+        refreshers = 0
+        for section in trange(0, num_sections, desc="Section", leave=False):
 
-            section_node = summary_index.all_nodes[section_index]
-            section_child_indicies = sorted(section_node.child_indices)
-            full_dialogue.append(
-                f"Bob: Alright, let's talk about our {ordinal(section+1) if section+1 != len(part_sections) else 'last'} section today. Here's a bit of a refresher of where we are: {summary_creative_index.all_nodes[section_child_indicies[0]].text}")
+            if since_last_refresher == sections_per_refresher:
+                full_dialogue.append(
+                    f"Bob: Alright, let's talk about our {ordinal(refreshers + 1) if section + sections_per_refresher < num_sections else 'last'} section today. Here's a bit of a refresher of where we are: {parts_short[part][section]}")
 
-            obj['summaries'].append(
-                summary_creative_index.all_nodes[section_child_indicies[0]].text)
-            obj['lines'].append({
-                'speaker': 1,
-                'text': full_dialogue[len(full_dialogue) - 1],
-                'summary': len(obj['summaries']) - 1
-            })
+                obj['summaries'].append(parts_short[part][section])
+                obj['lines'].append({
+                    'speaker': 1,
+                    'text': full_dialogue[len(full_dialogue) - 1],
+                    'summary': len(obj['summaries']) - 1
+                })
 
-            if print_dialogue:
-                print(full_dialogue[len(full_dialogue)-1])
+                if print_dialogue:
+                    print(full_dialogue[len(full_dialogue)-1])
 
-            for passage_index in tqdm(section_child_indicies, desc="Passage", leave=False):
+                since_last_refresher = 0
+                refreshers += 1
+            else:
+                since_last_refresher += 1
 
-                alice_summary = summary_index.all_nodes[passage_index].text
-                alice_situation = SITUATION + alice_summary
-                bob_summary = summary_creative_index.all_nodes[passage_index].text
-                bob_situation = SITUATION + bob_summary
+            # split passages along token boundaries
+            part_summary_long = parts_long[part][section]
+            tokenized_offsets = tokenizer.encode_plus(
+                part_summary_long, return_offsets_mapping=True).encodings[0].offsets
+            tokenized_offsets.pop()  # remove end special token
+            passage_offsets = [tokenized_offsets[i:i+summary_context_tokens]
+                               for i in range(0, len(tokenized_offsets), summary_context_tokens)]
+            for tokenized_passage in tqdm(passage_offsets, desc="Passage", leave=False):
 
-                obj['summaries'].extend([alice_summary, bob_summary])
-                bob_summary_index = len(obj['summaries']) - 1
-                alice_summary_index = bob_summary_index - 1
+                summary_start = tokenized_passage[0][0]
+                summary_end = tokenized_passage[len(tokenized_passage) - 1][1]
+
+                summary = part_summary_long[summary_start:summary_end+1]
+
+                situation = SITUATION.format(title=title, author=author, passage=summary)
+                obj['summaries'].append(summary)
+                summary_index = len(obj['summaries']) - 1
 
                 alice_dialogue = []
                 bob_dialogue = []
@@ -181,14 +190,15 @@ def generate_scripts(title: str, author: str, part_glob=4, print_dialogue=False)
                 # other, and this lets is double the history (which is needed given cosmo's very short)
                 # input token limit (512)
 
-                for _ in trange(DIALOGUES_PER_PASSAGE, desc="Dialogue", leave=False):
+                for _ in trange(dialogues_per_passage, desc="Dialogue", leave=False):
+                    alice_history = bob_dialogue[-dialogue_history_len:]
                     response = chain.run(
-                        narrative=alice_situation, instruction=INSTRUCTION_ALICE, dialogue_history=bob_dialogue)
+                        narrative=situation, instruction=INSTRUCTION_ALICE, dialogue_history=alice_history)
 
                     obj['lines'].append({
                         'speaker': 0,
                         'text': response,
-                        'summary': alice_summary_index
+                        'summary': summary_index
                     })
 
                     response = f"Alice: {response}"
@@ -198,13 +208,14 @@ def generate_scripts(title: str, author: str, part_glob=4, print_dialogue=False)
                     if print_dialogue:
                         print(response)
 
+                    bob_history = alice_dialogue[-dialogue_history_len:]
                     response = chain.run(
-                        narrative=bob_situation, instruction=INSTRUCTION_BOB, dialogue_history=alice_dialogue)
+                        narrative=situation, instruction=INSTRUCTION_BOB, dialogue_history=bob_history)
 
                     obj['lines'].append({
                         'speaker': 1,
                         'text': response,
-                        'summary': bob_summary_index
+                        'summary': summary_index
                     })
 
                     response = f"Bob: {response}"
@@ -227,8 +238,8 @@ def generate_scripts(title: str, author: str, part_glob=4, print_dialogue=False)
             'text': full_dialogue[len(full_dialogue) - 1][5:],
         })
 
-        open(os.path.join(scripts, f"part{part+1}.txt"), "w",
+        open(os.path.join(get_output_dir(title, "scripts"), f"part{part+1}.txt"), "w",
              encoding="utf8").writelines([x + "\n" for x in full_dialogue])
 
-        json.dump(open(os.path.join(get_output_dir(
+        json.dump(obj, open(os.path.join(get_output_dir(
             title), f"part{part+1}.json"), "w", encoding="utf8"), indent=2)

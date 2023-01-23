@@ -1,18 +1,17 @@
+import argparse
 import sys
-from literai.util import arg_parser
-from literai.summary import gpt_index_summarize
+from literai.summary import summarize
 
 
 def main():
-    args = arg_parser().parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("title", help="title of the novel")
+    parser.add_argument("txt", help="path to raw .txt of novel")
+    args = parser.parse_args()
 
     print("------------- PART 1 (Summarize text) ------------- ")
-
-    print("Generating base summary")
-    gpt_index_summarize(args.title, args.txt, "summary")
-    print("Generating creative summary")
-    gpt_index_summarize(args.title, args.txt, "creative",
-                        early_stopping=True, length_penalty=0.4, num_beams=8)
+    summarize(args.title, args.txt, 2048, 256)
+    summarize(args.title, args.txt, 2048, 128)
 
 
 if __name__ == '__main__':

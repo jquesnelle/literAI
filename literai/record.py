@@ -95,7 +95,7 @@ def record_podcast(title: str, voices: List[str], save_recorded_lines=True):
                 podcast_duration += silence_duration
 
             full_line = []
-            if len(split_text[0]) > 0:
+            if len(split_text) > 0 and len(split_text[0]) > 0:
                 for to_say in split_text:
                     gen = tts.tts_with_preset(to_say, voice_samples=voice_samples,
                                               conditioning_latents=conditioning_latents, preset='standard', k=1, verbose=False).squeeze(0).cpu()

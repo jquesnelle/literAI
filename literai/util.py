@@ -26,11 +26,3 @@ def get_output_dir(title: str, *subdirs) -> str:
     dir = os.path.join(os.getcwd(), 'output', slugify(title), *subdirs)
     os.makedirs(dir, exist_ok=True)
     return dir
-
-
-def arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("title", help="title of the novel")
-    parser.add_argument("author", help="author of the novel")
-    parser.add_argument("txt", help="path to raw .txt of novel")
-    return parser

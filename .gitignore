@@ -5,3 +5,4 @@ dist/
 *.egg-info
 .vscode/launch.json
 output/
+*.txt
