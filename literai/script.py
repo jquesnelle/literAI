@@ -98,6 +98,7 @@ def generate_scripts(
     chain = LLMChain(llm=llm, prompt=prompt)
 
     num_parts = len(parts_long)
+    batch = 0
 
     for part in trange(0, num_parts, desc="Part", leave=False):
 
@@ -148,11 +149,9 @@ def generate_scripts(
                 full_dialogue.append(
                     f"Bob: Alright, let's talk about our {ordinal(refreshers + 1) if section + sections_per_refresher < num_sections else 'last'} section today. Here's a bit of a refresher of where we are: {parts_short[part][section]}")
 
-                obj['summaries'].append(parts_short[part][section])
                 obj['lines'].append({
                     'speaker': 1,
                     'text': full_dialogue[len(full_dialogue) - 1],
-                    'summary': len(obj['summaries']) - 1
                 })
 
                 if print_dialogue:
@@ -178,7 +177,7 @@ def generate_scripts(
                 summary = part_summary_long[summary_start:summary_end+1]
 
                 situation = SITUATION.format(title=title, author=author, passage=summary)
-                obj['summaries'].append(summary)
+                obj['summaries'].append({"text": summary, "batch": batch})
                 summary_index = len(obj['summaries']) - 1
 
                 alice_dialogue = []
@@ -224,6 +223,8 @@ def generate_scripts(
                     full_dialogue.append(response)
                     if print_dialogue:
                         print(response)
+
+            batch += 1
 
         full_dialogue.append(
             "Alice: Okay, that's all the time we have for today!")
