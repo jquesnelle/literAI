@@ -10,6 +10,7 @@ from tortoise.utils.audio import load_voices
 from tqdm import tqdm
 
 SAMPLE_RATE = 24000
+MAX_SPEECH_LEN = 192
 TAGLINE = "Happy singularity!"
 
 
@@ -77,11 +78,11 @@ def record_podcast(title: str, voices: List[str], save_recorded_lines=True):
             split_text = []
             # I'm sure there's a more elegant way to do this
             while len(text) > 0:
-                if len(text) <= 256:
+                if len(text) <= MAX_SPEECH_LEN:
                     split_text.append(text)
                     text = ""
                 else:
-                    i = 256
+                    i = MAX_SPEECH_LEN
                     while i < len(text):
                         if text[i] == ' ':
                             break
