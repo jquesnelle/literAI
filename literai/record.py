@@ -1,13 +1,14 @@
 import functools
 import json
 import os
-from typing import Dict, List
 import torch
 import torchaudio
-from literai.util import get_output_dir
+from literai.util import get_output_dir, logger_error
+from pydub import AudioSegment
 from tortoise.api import TextToSpeech, MODELS_DIR
 from tortoise.utils.audio import load_voices
 from tqdm import tqdm
+from typing import Dict, List
 
 SAMPLE_RATE = 24000
 MAX_SPEECH_LEN = 192
@@ -17,7 +18,7 @@ TAGLINE = "Happy singularity!"
 def duration(speech: torch.tensor) -> float:
     return speech.shape[1] / SAMPLE_RATE
 
-
+@logger_error
 def record_podcast(title: str, voices: List[str], save_recorded_lines=True):
     base_dir = get_output_dir(title)
     parts = [os.path.join(base_dir, f) for f in os.listdir(
@@ -55,7 +56,7 @@ def record_podcast(title: str, voices: List[str], save_recorded_lines=True):
 
     recorded = get_output_dir(title, "recorded")
 
-    for part in tqdm(parts, desc="Part", leave=False):
+    for part in tqdm(parts, desc="Part"):
         obj = json.load(open(part, "r", encoding="utf8"))
 
         part_base = os.path.basename(part)
@@ -116,20 +117,29 @@ def record_podcast(title: str, voices: List[str], save_recorded_lines=True):
                 else:
                     recorded_line = torch.cat(full_line, dim=-1)
 
-                filename = f"{part_base}-{speaker}-{speakers_counts[speaker] - 1}.wav"
-                torchaudio.save(os.path.join(
-                    recorded_lines, filename), recorded_line, SAMPLE_RATE)
+                filename = f"{part_base}-{speaker}-{speakers_counts[speaker] - 1}"
+                wav_path = os.path.join(recorded_lines, filename) + ".wav"
+                torchaudio.save(wav_path, recorded_line, SAMPLE_RATE)
 
-                line['audio'] = f"recorded-lines/{filename}"
+                AudioSegment.from_file(wav_path, format="wav").export(os.path.join(
+                    recorded_lines, filename) + ".mp3", format="mp3", bitrate="192k")
+                os.remove(wav_path)
+
+                line['audio'] = f"recorded-lines/{filename}.mp3"
 
         podcast.append(ending)
         podcast_duration += duration(ending)
-
         obj['duration'] = podcast_duration
-        obj['audio'] = f"recorded/{part_base}.wav"
 
         full_audio = torch.cat(podcast, dim=-1)
-        torchaudio.save(os.path.join(
-            recorded, f"{part_base}.wav"), full_audio, SAMPLE_RATE)
+
+        wav_path = os.path.join(recorded, part_base) + ".wav"
+        torchaudio.save(wav_path, full_audio, SAMPLE_RATE)
+
+        AudioSegment.from_file(wav_path, format="wav").export(os.path.join(
+            recorded, part_base) + ".mp3", format="mp3", bitrate="192k")
+        os.remove(wav_path)
+
+        obj['audio'] = f"recorded/{part_base}.mp3"
 
         json.dump(obj, open(part, "w", encoding="utf8"), indent=2)

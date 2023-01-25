@@ -1,8 +1,8 @@
 import json
 import os
 from diffusers import StableDiffusionPipeline, EulerAncestralDiscreteScheduler
-from literai.util import get_output_dir
-from transformers import AutoTokenizer, T5Tokenizer, T5ForConditionalGeneration, BloomTokenizerFast, BloomForCausalLM
+from literai.util import get_output_dir, logger_error
+from transformers import AutoTokenizer, T5Tokenizer, T5ForConditionalGeneration
 from tqdm import tqdm
 from tqdm.contrib import tenumerate
 
@@ -41,7 +41,7 @@ scene: """
 DEFAULT_DRAW_PROMPT = \
     "dreamlikeart, {description}, in the style of artgerm and charlie bowater and atey ghailan and mike mignola, vibrant colors and hard shadows and strong rim light, comic cover art, epic scene, plain background, trending on artstation"
 
-
+@logger_error
 def generate_image_descriptions(
         title: str,
         txt: str,
@@ -73,7 +73,7 @@ def generate_image_descriptions(
     parts = [os.path.join(base_dir, f) for f in os.listdir(
         base_dir) if f.startswith("part") and f.endswith(".json")]
 
-    for part in tqdm(parts, desc="Part", leave=False):
+    for part in tqdm(parts, desc="Part"):
         obj = json.load(open(part, "r", encoding="utf8"))
 
         last_batch = None
@@ -110,13 +110,9 @@ def generate_image_descriptions(
                 input_ids = tokenizer(
                     prompt, return_tensors="pt").input_ids.to("cuda")
                 outputs = model.generate(
-                    input_ids, max_new_tokens=32)
+                    input_ids, max_new_tokens=24)
                 result: str = tokenizer.decode(
                     outputs[0], skip_special_tokens=True)
-
-                # remove some unneccesary verbage
-                result = result.replace(' are', '').replace(
-                    ' is', '').replace('scene: ', '').replace(' was', '').replace(' were', '').strip()
 
                 if len(result) > 10:
                     summary['descriptions'].append(result)
@@ -125,11 +121,12 @@ def generate_image_descriptions(
 
         json.dump(obj, open(part, "w", encoding="utf8"), indent=2)
 
-
-def generate_images(title: str, draw_model_id=DEFAULT_DRAW_MODEL_ID, draw_prompt=DEFAULT_DRAW_PROMPT):
+@logger_error
+def generate_images(title: str, draw_model_id, draw_prompt):
     draw_pipe = StableDiffusionPipeline.from_pretrained(draw_model_id)
     draw_pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
         draw_pipe.scheduler.config)
+    draw_pipe.set_progress_bar_config(disable=True)
     draw_pipe = draw_pipe.to("cuda")
 
     base_dir = get_output_dir(title)
@@ -138,7 +135,7 @@ def generate_images(title: str, draw_model_id=DEFAULT_DRAW_MODEL_ID, draw_prompt
 
     images = get_output_dir(title, "images")
 
-    for part in tqdm(parts, desc="Part", leave=False):
+    for part in tqdm(parts, desc="Part"):
         obj = json.load(open(part, "r", encoding="utf8"))
 
         part_base = os.path.basename(part)
@@ -148,6 +145,10 @@ def generate_images(title: str, draw_model_id=DEFAULT_DRAW_MODEL_ID, draw_prompt
             summary["images"] = []
 
             for description_index, description in tenumerate(summary['descriptions'], desc="Description", leave=False):
+                # remove some unneccesary verbage / cleanup for prompt
+                description = description.replace(' are', '').replace(
+                    ' is', '').replace('scene: ', '').replace(' was', '').replace(' were', '').strip()
+
                 prompt = draw_prompt.format(description=description)
 
                 image = draw_pipe(prompt, height=768, width=512,

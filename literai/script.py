@@ -10,7 +10,7 @@ from langchain.chains import LLMChain
 from transformers import AutoTokenizer, T5Tokenizer, AutoModelForSeq2SeqLM, pipeline
 from tqdm import tqdm
 from tqdm.auto import trange
-from .util import get_output_dir
+from .util import get_output_dir, logger_error
 
 MODEL_ID = "allenai/cosmo-xl"
 SITUATION = "Alice and Bob are hosts of a literary criticism podcast. They are discussing a passage from the book \"{title}\" by \"{author}\" that they both recently read. The conversation is academic, intelligent, nuanced, and elaborate. They are currently discussing the following passage:\n{passage}"
@@ -56,7 +56,7 @@ def ordinal(n: int):
         suffix = ['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]
     return str(n) + suffix
 
-
+@logger_error
 def generate_scripts(
         title: str,
         author: str,
@@ -102,7 +102,7 @@ def generate_scripts(
     num_parts = len(parts_long)
     batch = 0
 
-    for part in trange(0, num_parts, desc="Part", leave=False):
+    for part in trange(0, num_parts, desc="Part"):
 
         obj = {
             'book_title': title,

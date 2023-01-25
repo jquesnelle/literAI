@@ -1,6 +1,10 @@
 import argparse
 import sys
-from literai.script import generate_scripts
+from literai.steps.util import free_memory_after
+
+@free_memory_after
+def step6(title: str, txt: str):
+    print("------------- STEP 6 (Finalize) ------------- ")
 
 
 def main():
@@ -9,8 +13,7 @@ def main():
     parser.add_argument("author", help="author of the novel")
     args = parser.parse_args()
 
-    print("------------- PART 2 (Write scripts) ------------- ")
-    generate_scripts(args.title, args.author)
+    step6(args.title, args.txt)
 
 
 if __name__ == '__main__':

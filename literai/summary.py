@@ -1,11 +1,11 @@
 
 import os
 from textsum.summarize import Summarizer
-from .util import get_output_dir
+from literai.util import get_output_dir, logger_error
 
 MODEL_ID = "pszemraj/long-t5-tglobal-xl-16384-book-summary"
 
-
+@logger_error
 def summarize(title: str, text_path: str, token_batch_length, max_new_tokens):
     summarizer = Summarizer(MODEL_ID, token_batch_length=token_batch_length,
                             max_length_ratio=(max_new_tokens / token_batch_length), encoder_no_repeat_ngram_size=None, no_repeat_ngram_size=None)

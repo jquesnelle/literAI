@@ -1,4 +1,5 @@
-import argparse
+import transformers
+import diffusers
 import os
 import unicodedata
 import re
@@ -26,3 +27,11 @@ def get_output_dir(title: str, *subdirs) -> str:
     dir = os.path.join(os.getcwd(), 'output', slugify(title), *subdirs)
     os.makedirs(dir, exist_ok=True)
     return dir
+
+
+def logger_error(func):
+    def wrapper(*args, **kwargs):
+        transformers.logging.set_verbosity_error()
+        diffusers.logging.set_verbosity_error()
+        func(*args, **kwargs)
+    return wrapper
