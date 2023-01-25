@@ -1,6 +1,5 @@
 import json
 import os
-import torch
 from diffusers import StableDiffusionPipeline, EulerAncestralDiscreteScheduler
 from literai.util import get_output_dir
 from transformers import AutoTokenizer, T5Tokenizer, T5ForConditionalGeneration, BloomTokenizerFast, BloomForCausalLM
@@ -8,9 +7,8 @@ from tqdm import tqdm
 from tqdm.contrib import tenumerate
 
 SUMMARY_MODEL_ID = "pszemraj/long-t5-tglobal-xl-16384-book-summary"
-PROMPT_MODEL_ID = "mrm8488/bloom-560m-finetuned-sd-prompts"
 DESCRIBE_MODEL_ID = "google/flan-t5-xl"
-DRAW_MODEL_ID = "dreamlike-art/dreamlike-diffusion-1.0"
+DEFAULT_DRAW_MODEL_ID = "dreamlike-art/dreamlike-diffusion-1.0"
 
 DESCRIBE_PROMPT = \
     r"""passage: There was certainly too much of it in the air. Even the Duchess sneezed occasionally; and as for the baby, it was sneezing and howling alternately without a moment's pause. The only things in the kitchen that did not sneeze, were the cook, and a large cat which was sitting on the hearth and grinning from ear to ear. "Please would you tell me," said Alice, a little timidly, for she was not quite sure whether it was good manners for her to speak first, "why your cat grins like that?" "It's a Cheshire cat," said the Duchess, "and that's why. Pig!"
@@ -40,15 +38,18 @@ scene: a man with a handsome face, pale complexion, and thin horizontal lines ar
 passage: {passage}
 scene: """
 
+DEFAULT_DRAW_PROMPT = \
+    "dreamlikeart, {description}, in the style of artgerm and charlie bowater and atey ghailan and mike mignola, vibrant colors and hard shadows and strong rim light, comic cover art, epic scene, plain background, trending on artstation"
+
 
 def generate_image_descriptions(
         title: str,
         txt: str,
         summarize_batch_length=2048,
         summary_batch_stride=16,
-        describe_batch_length=384,
+        describe_batch_length=256,
         describe_batch_stride=16,
-        print_descriptions=True):
+        print_descriptions=False):
     summarize_tokenizer = AutoTokenizer.from_pretrained(SUMMARY_MODEL_ID)
 
     # re-create the batches used for summarization
@@ -97,6 +98,7 @@ def generate_image_descriptions(
                 add_special_tokens=False,
             )
 
+            summary['descriptions'] = []
             for batch in tqdm(describe_encodings.encodings, desc="Batch", leave=False):
                 batch_text_start = batch.offsets[0][0]
                 batch_text_end = batch.offsets[len(batch.offsets) - 1][1]
@@ -108,13 +110,15 @@ def generate_image_descriptions(
                 input_ids = tokenizer(
                     prompt, return_tensors="pt").input_ids.to("cuda")
                 outputs = model.generate(
-                    input_ids, max_new_tokens=96, temperature=0.7, do_sample=True)
-                result = tokenizer.decode(
-                    outputs[0], skip_special_tokens=True).strip()
+                    input_ids, max_new_tokens=32)
+                result: str = tokenizer.decode(
+                    outputs[0], skip_special_tokens=True)
+
+                # remove some unneccesary verbage
+                result = result.replace(' are', '').replace(
+                    ' is', '').replace('scene: ', '').replace(' was', '').replace(' were', '').strip()
 
                 if len(result) > 10:
-                    if 'descriptions' not in summary:
-                        summary['descriptions'] = []
                     summary['descriptions'].append(result)
                     if print_descriptions:
                         print(result)
@@ -122,11 +126,10 @@ def generate_image_descriptions(
         json.dump(obj, open(part, "w", encoding="utf8"), indent=2)
 
 
-def generate_images(title: str):
-    draw_pipe = StableDiffusionPipeline.from_pretrained(DRAW_MODEL_ID)
+def generate_images(title: str, draw_model_id=DEFAULT_DRAW_MODEL_ID, draw_prompt=DEFAULT_DRAW_PROMPT):
+    draw_pipe = StableDiffusionPipeline.from_pretrained(draw_model_id)
     draw_pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
         draw_pipe.scheduler.config)
-    draw_pipe.set_use_memory_efficient_attention_xformers(True)
     draw_pipe = draw_pipe.to("cuda")
 
     base_dir = get_output_dir(title)
@@ -142,17 +145,17 @@ def generate_images(title: str):
         part_base = part_base[0:part_base.rfind('.')]
 
         for summary_index, summary in tenumerate(obj['summaries'], desc="Summary", leave=False):
+            summary["images"] = []
+
             for description_index, description in tenumerate(summary['descriptions'], desc="Description", leave=False):
+                prompt = draw_prompt.format(description=description)
 
-                prompt = f"dreamlikeart, {description}, highly detailed, digital painting, artstation, concept art, sharp focus, illustration, by justin gerard and artgerm, 8 k"
-
-                image = draw_pipe(prompt, height=512, width=768, num_inference_steps=50, guidance_scale=7).images[0]
+                image = draw_pipe(prompt, height=768, width=512,
+                                  num_inference_steps=50, guidance_scale=7).images[0]
 
                 image_filename = f"{part_base}-{summary_index}-{description_index}.png"
                 image.save(os.path.join(images, image_filename))
 
-                if "images" not in summary:
-                    summary["images"] = []
                 summary["images"].append(f"images/{image_filename}")
 
         json.dump(obj, open(part, "w", encoding="utf8"), indent=2)

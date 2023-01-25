@@ -14,8 +14,8 @@ from .util import get_output_dir
 
 MODEL_ID = "allenai/cosmo-xl"
 SITUATION = "Alice and Bob are hosts of a literary criticism podcast. They are discussing a passage from the book \"{title}\" by \"{author}\" that they both recently read. The conversation is academic, intelligent, nuanced, and elaborate. They are currently discussing the following passage:\n{passage}"
-INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob thought-provoking questions using specific details from the passage"
-INSTRUCTION_BOB = "Imagine you are Bob and respond to Alice using specific details from the passage"
+INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob thought-provoking questions about the characters, plot, motivations, style, tone, and values of the passage using specific details from the passage"
+INSTRUCTION_BOB = "Imagine you are Bob and respond to Alice intelligently using specific details from the passage"
 
 
 class NullLLM(BaseLLM):
