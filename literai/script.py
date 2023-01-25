@@ -7,15 +7,15 @@ from langchain.llms.base import BaseLLM
 from langchain.schema import LLMResult
 from langchain.prompts import BasePromptTemplate
 from langchain.chains import LLMChain
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+from transformers import AutoTokenizer, T5Tokenizer, AutoModelForSeq2SeqLM, pipeline
 from tqdm import tqdm
 from tqdm.auto import trange
 from .util import get_output_dir
 
 MODEL_ID = "allenai/cosmo-xl"
 SITUATION = "Alice and Bob are hosts of a literary criticism podcast. They are discussing a passage from the book \"{title}\" by \"{author}\" that they both recently read. The conversation is academic, intelligent, nuanced, and elaborate. They are currently discussing the following passage:\n{passage}"
-INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob questions using specific details from the passage"
-INSTRUCTION_BOB = "Imagine you are Bob and respond to Alice"
+INSTRUCTION_ALICE = "Imagine you are Alice and ask Bob thought-provoking questions using specific details from the passage"
+INSTRUCTION_BOB = "Imagine you are Bob and respond to Alice using specific details from the passage"
 
 
 class NullLLM(BaseLLM):
@@ -60,15 +60,16 @@ def ordinal(n: int):
 def generate_scripts(
         title: str,
         author: str,
-        summary_long="summary-2048-256.txt",
-        summary_short="summary-2048-128.txt",
+        summary_long="summary-2048-512.txt",
+        summary_short="summary-2048-256.txt",
         sections_per_part=20,
-        max_dialogue_tokens=128,
-        summary_context_tokens=128,
-        dialogue_history_len=3,
-        dialogues_per_passage=3,
+        max_dialogue_tokens=160,
+        summary_context_tokens=512,
+        dialogue_history_max_len=8,
+        dialogues_per_passage=4,
+        one_sided_dialogue_history=False,
         sections_per_refresher=4,
-        temperature=1.0,
+        temperature=0.9,
         top_p=0.95,
         print_dialogue=False):
 
@@ -77,7 +78,8 @@ def generate_scripts(
     summary_short = [x.strip() for x in open(os.path.join(get_output_dir(
         title, "summaries"), summary_short), "r", encoding="utf-8").readlines()]
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+    batch_tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+    tokenizer = T5Tokenizer.from_pretrained(MODEL_ID, model_max_length=2048)
 
     parts_long = [summary_long[i:i+sections_per_part]
                   for i in range(0, len(summary_long), sections_per_part)]
@@ -164,7 +166,7 @@ def generate_scripts(
 
             # split passages along token boundaries
             part_summary_long = parts_long[part][section]
-            tokenized_offsets = tokenizer.encode_plus(
+            tokenized_offsets = batch_tokenizer.encode_plus(
                 part_summary_long, return_offsets_mapping=True).encodings[0].offsets
             tokenized_offsets.pop()  # remove end special token
             passage_offsets = [tokenized_offsets[i:i+summary_context_tokens]
@@ -176,7 +178,8 @@ def generate_scripts(
 
                 summary = part_summary_long[summary_start:summary_end+1]
 
-                situation = SITUATION.format(title=title, author=author, passage=summary)
+                situation = SITUATION.format(
+                    title=title, author=author, passage=summary)
                 obj['summaries'].append({"text": summary, "batch": batch})
                 summary_index = len(obj['summaries']) - 1
 
@@ -186,13 +189,14 @@ def generate_scripts(
 
                 # one trick here is to only pass in the opposite side of the dialogue as history.
                 # it seems that cosmo can effectively "infer" what one side would have said given the
-                # other, and this lets is double the history (which is needed given cosmo's very short)
-                # input token limit (512)
+                # other, and this lets is double the history
 
                 for _ in trange(dialogues_per_passage, desc="Dialogue", leave=False):
-                    alice_history = bob_dialogue[-dialogue_history_len:]
-                    response = chain.run(
-                        narrative=situation, instruction=INSTRUCTION_ALICE, dialogue_history=alice_history)
+                    alice_history = bob_dialogue if one_sided_dialogue_history else passage_dialogue
+                    response = ""
+                    while len(response.strip()) == 0:
+                        response = chain.run(
+                            narrative=situation, instruction=INSTRUCTION_ALICE, dialogue_history=alice_history[-dialogue_history_max_len:])
 
                     obj['lines'].append({
                         'speaker': 0,
@@ -207,9 +211,9 @@ def generate_scripts(
                     if print_dialogue:
                         print(response)
 
-                    bob_history = alice_dialogue[-dialogue_history_len:]
+                    bob_history = alice_dialogue if one_sided_dialogue_history else passage_dialogue
                     response = chain.run(
-                        narrative=situation, instruction=INSTRUCTION_BOB, dialogue_history=bob_history)
+                        narrative=situation, instruction=INSTRUCTION_BOB, dialogue_history=bob_history[-dialogue_history_max_len:])
 
                     obj['lines'].append({
                         'speaker': 1,

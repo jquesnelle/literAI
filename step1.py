@@ -10,6 +10,7 @@ def main():
     args = parser.parse_args()
 
     print("------------- PART 1 (Summarize text) ------------- ")
+    summarize(args.title, args.txt, 2048, 512)
     summarize(args.title, args.txt, 2048, 256)
     summarize(args.title, args.txt, 2048, 128)
 
