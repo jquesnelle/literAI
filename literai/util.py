@@ -4,6 +4,7 @@ import os
 import unicodedata
 import re
 
+_BASE_OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 
 def slugify(value, allow_unicode=False):
     """
@@ -24,10 +25,16 @@ def slugify(value, allow_unicode=False):
 
 
 def get_output_dir(title: str, *subdirs) -> str:
-    dir = os.path.join(os.getcwd(), 'output', slugify(title), *subdirs)
+    dir =  os.path.join(_BASE_OUTPUT_DIR, slugify(title), *subdirs)
     os.makedirs(dir, exist_ok=True)
     return dir
 
+def set_base_output_dir(path: str):
+    global _BASE_OUTPUT_DIR
+    _BASE_OUTPUT_DIR = path
+
+def get_base_output_dir() -> str:
+    return _BASE_OUTPUT_DIR
 
 def logger_error(func):
     def wrapper(*args, **kwargs):

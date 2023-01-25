@@ -4,7 +4,7 @@ setup(
     name='liter-AI',
     packages=["literai"],
     version='1.0.0',
-    description='Generate visual podcasts using open source models',
+    description='Generate visual podcasts about novels using open source models',
     author='Jeffrey Quesnelle',
     author_email='jq@jeffq.com',
     url='https://github.com/jquesnelle/liter-AI/',
@@ -13,10 +13,13 @@ setup(
         'transformers',
         'accelerate',
         'torch',
-        'protobuf==3.20.0',
+        'protobuf<=3.19.6',
         'tqdm',
         'diffusers'
     ],
+    extras_require = {
+        'gcloud': ["google-cloud-storage"]
+    },
     entry_points={
         'console_scripts': [
             'literai = literai.__main__:main',
