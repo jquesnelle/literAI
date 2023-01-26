@@ -20,6 +20,8 @@ def duration(speech: torch.tensor) -> float:
 
 @logger_error
 def record_podcast(title: str, voices: List[str], save_recorded_lines=True):
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
     base_dir = get_output_dir(title)
     parts = [os.path.join(base_dir, f) for f in os.listdir(
         base_dir) if f.startswith("part") and f.endswith(".json")]

@@ -1,7 +1,9 @@
 import argparse
+import glob
 import json
 import os
 import sys
+import tqdm
 from literai.util import get_base_output_dir, get_output_dir, slugify
 from literai.steps.util import free_memory_after
 from typing import Optional
@@ -64,6 +66,14 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
 
     json.dump(index, storage_bucket.blob("index.json").open("w", encoding="utf-8")
               if storage_bucket is not None else open(index_path, "w", encoding="utf-8"), indent=2)
+
+    if storage_bucket is not None:
+        rel_paths = glob.glob(title_dir + '/**', recursive=True)
+        for local_file in tqdm(rel_paths, desc="Upload"):
+            remote_path = f'{title_slug}/{"/".join(local_file.split(os.sep)[1:])}'
+            if os.path.isfile(local_file):
+                blob = storage_bucket.blob(remote_path)
+                blob.upload_from_filename(local_file)
 
 
 def main():
