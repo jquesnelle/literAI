@@ -1,13 +1,13 @@
 from setuptools import setup
 
 setup(
-    name='liter-AI',
+    name='literAI',
     packages=["literai"],
     version='1.0.0',
     description='Generate visual podcasts about novels using open source models',
     author='Jeffrey Quesnelle',
     author_email='jq@jeffq.com',
-    url='https://github.com/jquesnelle/liter-AI/',
+    url='https://github.com/jquesnelle/literAI/',
     license='MIT',
     install_requires=[
         'transformers',

@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Optional
 from diffusers import StableDiffusionPipeline, EulerAncestralDiscreteScheduler
 from literai.util import get_output_dir, logger_error
 from transformers import AutoTokenizer, T5Tokenizer, T5ForConditionalGeneration
@@ -40,6 +41,7 @@ scene: """
 
 DEFAULT_DRAW_PROMPT = \
     "dreamlikeart, {description}, in the style of artgerm and charlie bowater and atey ghailan and mike mignola, vibrant colors and hard shadows and strong rim light, comic cover art, epic scene, plain background, trending on artstation"
+
 
 @logger_error
 def generate_image_descriptions(
@@ -121,8 +123,9 @@ def generate_image_descriptions(
 
         json.dump(obj, open(part, "w", encoding="utf8"), indent=2)
 
+
 @logger_error
-def generate_images(title: str, draw_model_id, draw_prompt):
+def generate_images(title: str, draw_model_id, draw_prompt, single_part: Optional[str] = None):
     draw_pipe = StableDiffusionPipeline.from_pretrained(draw_model_id)
     draw_pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
         draw_pipe.scheduler.config)
@@ -131,7 +134,7 @@ def generate_images(title: str, draw_model_id, draw_prompt):
 
     base_dir = get_output_dir(title)
     parts = [os.path.join(base_dir, f) for f in os.listdir(
-        base_dir) if f.startswith("part") and f.endswith(".json")]
+        base_dir) if f.startswith("part" if single_part is None else f"{single_part}.") and f.endswith(".json")]
 
     images = get_output_dir(title, "images")
 

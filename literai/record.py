@@ -8,7 +8,7 @@ from pydub import AudioSegment
 from tortoise.api import TextToSpeech, MODELS_DIR
 from tortoise.utils.audio import load_voices
 from tqdm import tqdm
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 SAMPLE_RATE = 24000
 MAX_SPEECH_LEN = 192
@@ -18,13 +18,14 @@ TAGLINE = "Happy singularity!"
 def duration(speech: torch.tensor) -> float:
     return speech.shape[1] / SAMPLE_RATE
 
+
 @logger_error
-def record_podcast(title: str, voices: List[str], save_recorded_lines=True):
+def record_podcast(title: str, voices: List[str], save_recorded_lines=False, single_part: Optional[str] = None):
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     base_dir = get_output_dir(title)
     parts = [os.path.join(base_dir, f) for f in os.listdir(
-        base_dir) if f.startswith("part") and f.endswith(".json")]
+        base_dir) if f.startswith("part" if single_part is None else f"{single_part}.") and f.endswith(".json")]
 
     tts = TextToSpeech(models_dir=MODELS_DIR)
 

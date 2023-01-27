@@ -3,16 +3,19 @@ import glob
 import json
 import os
 import sys
-import tqdm
 from literai.util import get_base_output_dir, get_output_dir, slugify
 from literai.steps.util import free_memory_after
 from typing import Optional
+from tqdm import tqdm
 
 
 @free_memory_after
 def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_bucket: Optional[str]):
     print("------------- STEP 6 (Finalize) ------------- ")
 
+    title_slug = slugify(title)
+
+    base_output_dir = get_base_output_dir()
     title_dir = get_output_dir(title)
     parts = [f for f in os.listdir(title_dir) if f.startswith(
         "part") and f.endswith(".json")]
@@ -20,14 +23,14 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
     obj = {
         "title": title,
         "author": author,
-        "parts": parts
+        "slug": title_slug,
+        "parts": parts,
     }
 
-    title_slug = slugify(title)
     json.dump(obj, open(os.path.join(
         title_dir, f"{title_slug}.json"), "w", encoding="utf-8"), indent=2)
 
-    index_path = os.path.join(get_base_output_dir(), "index.json")
+    index_path = os.path.join(base_output_dir, "index.json")
 
     if gcloud_credentials is not None:
         from google.cloud import storage
@@ -44,16 +47,18 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
             index = json.load(index_blob.open("r", encoding="utf-8"))
         else:
             index = []
+
+        local_files = glob.glob(title_dir + '/**', recursive=True)
+        local_path_offset = len(base_output_dir) + len(os.path.sep)
+        for local_file in tqdm(local_files, desc="Upload"):
+            if os.path.isfile(local_file):
+                remote_path = local_file[local_path_offset:]
+                blob = storage_bucket.blob(remote_path)
+                blob.upload_from_filename(local_file)
     elif os.path.exists(index_path):
         index = json.load(open(index_path, "r", encoding="utf-8"))
     else:
         index = []
-
-    obj = {
-        "title": title,
-        "author": author,
-        "data": f"{title_slug}/{title_slug}.json"
-    }
 
     found = False
     for i in range(0, len(index)):
@@ -66,14 +71,6 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
 
     json.dump(index, storage_bucket.blob("index.json").open("w", encoding="utf-8")
               if storage_bucket is not None else open(index_path, "w", encoding="utf-8"), indent=2)
-
-    if storage_bucket is not None:
-        rel_paths = glob.glob(title_dir + '/**', recursive=True)
-        for local_file in tqdm(rel_paths, desc="Upload"):
-            remote_path = f'{title_slug}/{"/".join(local_file.split(os.sep)[1:])}'
-            if os.path.isfile(local_file):
-                blob = storage_bucket.blob(remote_path)
-                blob.upload_from_filename(local_file)
 
 
 def main():
