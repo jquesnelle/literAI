@@ -4,7 +4,7 @@ from typing import Optional
 from diffusers import StableDiffusionPipeline, EulerAncestralDiscreteScheduler
 from literai.util import get_output_dir, logger_error
 from transformers import AutoTokenizer, T5Tokenizer, T5ForConditionalGeneration
-from tqdm import tqdm
+from tqdm import tqdm, trange
 from tqdm.contrib import tenumerate
 
 SUMMARY_MODEL_ID = "pszemraj/long-t5-tglobal-xl-16384-book-summary"
@@ -125,7 +125,7 @@ def generate_image_descriptions(
 
 
 @logger_error
-def generate_images(title: str, draw_model_id, draw_prompt, single_part: Optional[str] = None):
+def generate_images(title: str, draw_model_id, draw_prompt, num_title_images=4, num_images_per_description=1, single_part: Optional[str] = None):
     draw_pipe = StableDiffusionPipeline.from_pretrained(draw_model_id)
     draw_pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
         draw_pipe.scheduler.config)
@@ -144,6 +144,14 @@ def generate_images(title: str, draw_model_id, draw_prompt, single_part: Optiona
         part_base = os.path.basename(part)
         part_base = part_base[0:part_base.rfind('.')]
 
+        obj["images"] = []
+        for title_image_index in trange(0, num_title_images, desc="Image"):
+            image = draw_pipe(draw_prompt.format(description=title), height=768, width=512,
+                              num_inference_steps=50, guidance_scale=7).images[0]
+            image_filename = f"{part_base}-title-{title_image_index}.png"
+            image.save(os.path.join(images, image_filename))
+            obj["images"].append(f"images/{image_filename}")
+
         for summary_index, summary in tenumerate(obj['summaries'], desc="Summary", leave=False):
             summary["images"] = []
 
@@ -152,14 +160,11 @@ def generate_images(title: str, draw_model_id, draw_prompt, single_part: Optiona
                 description = description.replace(' are', '').replace(
                     ' is', '').replace('scene: ', '').replace(' was', '').replace(' were', '').strip()
 
-                prompt = draw_prompt.format(description=description)
-
-                image = draw_pipe(prompt, height=768, width=512,
-                                  num_inference_steps=50, guidance_scale=7).images[0]
-
-                image_filename = f"{part_base}-{summary_index}-{description_index}.png"
-                image.save(os.path.join(images, image_filename))
-
-                summary["images"].append(f"images/{image_filename}")
+                for description_image_index in trange(0, num_images_per_description, desc="Image"):
+                    image = draw_pipe(draw_prompt.format(description=description), height=768, width=512,
+                                      num_inference_steps=50, guidance_scale=7).images[0]
+                    image_filename = f"{part_base}-{summary_index}-{description_index}-{description_image_index}.png"
+                    image.save(os.path.join(images, image_filename))
+                    summary["images"].append(f"images/{image_filename}")
 
         json.dump(obj, open(part, "w", encoding="utf8"), indent=2)

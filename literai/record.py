@@ -101,17 +101,20 @@ def record_podcast(title: str, voices: List[str], save_recorded_lines=False, sin
 
             full_line = []
             if len(split_text) > 0 and len(split_text[0]) > 0:
+                line_duration = 0
                 for to_say in split_text:
                     gen = tts.tts_with_preset(to_say, voice_samples=voice_samples,
                                               conditioning_latents=conditioning_latents, preset='standard', k=1, verbose=False).squeeze(0).cpu()
+                    line_duration += duration(gen)
                     full_line.append(gen)
                     podcast.append(gen)
             else:
+                line_duration = silence_duration * 2
                 full_line = [silence, silence]
                 gen = torch.cat(full_line, dim=-1)
 
             line['start'] = podcast_duration
-            podcast_duration += duration(gen)
+            podcast_duration += line_duration
             line['end'] = podcast_duration
 
             if recorded_lines is not None:

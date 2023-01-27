@@ -3,6 +3,8 @@ import glob
 import json
 import os
 import sys
+import time
+from literai.version import __version__
 from literai.util import get_base_output_dir, get_output_dir, slugify
 from literai.steps.util import free_memory_after
 from typing import Optional
@@ -25,6 +27,8 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
         "author": author,
         "slug": title_slug,
         "parts": parts,
+        "literai_version": __version__,
+        "created_at": int(time.time())
     }
 
     json.dump(obj, open(os.path.join(
@@ -43,7 +47,6 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
     if storage_bucket is not None:
         index_blob = storage_bucket.blob("index.json")
         if index_blob.exists():
-            print(f"Pulling index.json from {gcloud_bucket}")
             index = json.load(index_blob.open("r", encoding="utf-8"))
         else:
             index = []
@@ -62,7 +65,7 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
 
     found = False
     for i in range(0, len(index)):
-        if slugify(index[i]["title"]) == title_slug:
+        if index[i]["slug"] == title_slug:
             index[i] = obj
             found = True
             break

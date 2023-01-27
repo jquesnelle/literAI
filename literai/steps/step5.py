@@ -5,7 +5,7 @@ from literai.record import record_podcast
 from literai.steps.util import free_memory_after
 
 @free_memory_after
-def step5(title: str, alice_voice: str, bob_voice: str, single_part: Optional[str]):
+def step5(title: str, alice_voice: str, bob_voice: str, single_part: Optional[str]=None):
     print("------------- STEP 5 (Record audio) ------------- ")
     record_podcast(title, [alice_voice, bob_voice], single_part=single_part)
 
