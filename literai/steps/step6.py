@@ -28,7 +28,7 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
     }
 
     json.dump(obj, open(os.path.join(
-        title_dir, f"{title_slug}.json"), "w", encoding="utf-8"), indent=2)
+        title_dir, "index.json"), "w", encoding="utf-8"), indent=2)
 
     index_path = os.path.join(base_output_dir, "index.json")
 
