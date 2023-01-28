@@ -145,7 +145,7 @@ def generate_images(title: str, draw_model_id, draw_prompt, num_title_images=4, 
         part_base = part_base[0:part_base.rfind('.')]
 
         obj["images"] = []
-        for title_image_index in trange(0, num_title_images, desc="Image"):
+        for title_image_index in trange(0, num_title_images, desc="Image", leave=False):
             image = draw_pipe(draw_prompt.format(description=title), height=768, width=512,
                               num_inference_steps=50, guidance_scale=7).images[0]
             image_filename = f"{part_base}-title-{title_image_index}.png"
@@ -160,7 +160,7 @@ def generate_images(title: str, draw_model_id, draw_prompt, num_title_images=4, 
                 description = description.replace(' are', '').replace(
                     ' is', '').replace('scene: ', '').replace(' was', '').replace(' were', '').strip()
 
-                for description_image_index in trange(0, num_images_per_description, desc="Image"):
+                for description_image_index in trange(0, num_images_per_description, desc="Image", leave=False):
                     image = draw_pipe(draw_prompt.format(description=description), height=768, width=512,
                                       num_inference_steps=50, guidance_scale=7).images[0]
                     image_filename = f"{part_base}-{summary_index}-{description_index}-{description_image_index}.png"
