@@ -125,7 +125,7 @@ def generate_image_descriptions(
 
 
 @logger_error
-def generate_images(title: str, draw_model_id, draw_prompt, num_title_images=4, num_images_per_description=1, single_part: Optional[str] = None):
+def generate_images(title: str, draw_model_id, draw_prompt, num_title_images=12, num_images_per_description=1, single_part: Optional[str] = None):
     draw_pipe = StableDiffusionPipeline.from_pretrained(draw_model_id)
     draw_pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(
         draw_pipe.scheduler.config)

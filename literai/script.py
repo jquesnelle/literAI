@@ -118,8 +118,8 @@ def generate_scripts(
             "Alice: Welcome to liter A I, your local neighborhood literary podcast where we discuss, disect, and dismantle interesting novels and stories",
             "Bob: I'm Bob, a computer generated personality",
             f"Alice: And I'm Alice, and I'm also a computer generated personality. This is the {ordinal(part+1)} of our {num_parts} part series on \"{title}\" by \"{author}\"",
-            "Bob: Please support researchers that facilitate equal access to human knowledge by open sourcing their A I models",
-            "Alice: That's right, Bob. Remember there's nothing open about A I that's stuck behind an A P I! Okay, let's get started"
+            "Bob: As a reminder, please continue to support researchers that facilitate equal access to human knowledge by open sourcing their A I models",
+            "Alice: Couldn't agree more, Bob! Open access is tinder to the fire of innovation! Okay, shall we get started?"
         ]
         if print_dialogue:
             for x in full_dialogue:
@@ -153,7 +153,7 @@ def generate_scripts(
 
                 obj['lines'].append({
                     'speaker': 1,
-                    'text': full_dialogue[len(full_dialogue) - 1],
+                    'text': full_dialogue[len(full_dialogue) - 1][5:],
                 })
 
                 if print_dialogue:
