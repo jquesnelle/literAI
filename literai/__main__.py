@@ -19,6 +19,10 @@ def main():
         "--draw_model", help="stablediffusion model", default=DEFAULT_DRAW_MODEL_ID)
     parser.add_argument(
         "--draw_prompt", help="prompt template, with {description} to be replaced with description", default=DEFAULT_DRAW_PROMPT)
+    parser.add_argument("--gcloud_credentials",
+                        help="path to Google Cloud Storage service account .json credentials")
+    parser.add_argument("--gcloud_bucket",
+                        help="Google Cloud Storage buicket to upload to")
     args = parser.parse_args()
 
     step1(args.title, args.txt)
@@ -26,7 +30,7 @@ def main():
     step3(args.title, args.txt)
     step4(args.title, args.draw_model, args.draw_prompt)
     step5(args.title, args.alice_voice, args.bob_voice)
-    step6(args.title, args.author)
+    step6(args.title, args.author, args.gcloud_credentials, args.gcloud_bucket)
 
 
 if __name__ == '__main__':
