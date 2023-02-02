@@ -55,7 +55,9 @@ def step6(title: str, author: str, gcloud_credentials: Optional[str], gcloud_buc
         local_path_offset = len(base_output_dir) + len(os.path.sep)
         for local_file in tqdm(local_files, desc="Upload"):
             if os.path.isfile(local_file):
-                remote_path = local_file[local_path_offset:]
+                # normalize to / as path seperator -- GCS needs this to correctly create folders
+                remote_path = local_file[local_path_offset:].replace(
+                    os.path.sep, '/')
                 blob = storage_bucket.blob(remote_path)
                 blob.upload_from_filename(local_file)
     elif os.path.exists(index_path):

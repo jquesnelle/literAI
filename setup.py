@@ -21,7 +21,10 @@ setup(
         'torch',
         'protobuf<=3.19.6',
         'tqdm',
-        'diffusers'
+        'diffusers',
+        'langchain==0.0.65',
+        'sentencepiece',
+        'pydub'
     ],
     extras_require = {
         'gcloud': ["google-cloud-storage"]
