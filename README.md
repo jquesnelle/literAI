@@ -1,6 +1,6 @@
 # literAI
 
-literAI demo: [https://literai.hooloovoo.ai](https://literai.hooloovoo.ai) ([source](https://github.com/hooloovoo-ai/literAI-website))
+literAI demo: [https://literai.hooloovoo.ai](https://literai.hooloovoo.ai) ([source](https://github.com/hooloovoo-ai/literAI-website)) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1D61fr09JikQNuNErtYIMXg_D_Bmt5Z-1?usp=sharing)
 
 [literAI](https://github.com/jquesnelle/literAI) is an experiment in open source AI composition written by [emozilla](https://twitter.com/theemozilla).
 Originally inspired by [scribepod](https://github.com/yacineMTB/scribepod) by [yacine](https://twitter.com/yacineMTB), it creates a podcast where the two hosts, Alice and Bob, analyze a novel they both purportedly recently read, along with associated images generated from inferred descriptions of scenes in the novel.
